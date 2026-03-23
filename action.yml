@@ -102,8 +102,11 @@ runs:
       shell: bash
       working-directory: ${{ inputs.project-dir }}
       run: |
+        VERSION="${{ inputs.project-version }}"
+        VERSION="${VERSION#v}"
+
         mix exclosured_precompiled.precompile \
-          --version "${{ inputs.project-version }}" \
+          --version "${VERSION}" \
           --modules "${{ inputs.modules }}"
 
         ARCHIVE_DIR="_build/precompiled"
