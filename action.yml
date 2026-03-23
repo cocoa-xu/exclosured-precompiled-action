@@ -1,0 +1,120 @@
+name: Exclosured Precompiled Action
+description: >
+  Build Exclosured WASM modules and package them for precompiled distribution.
+  Compiles Rust to wasm32-unknown-unknown, runs wasm-bindgen, and creates
+  tar.gz archives with SHA-256 checksums.
+branding:
+  icon: package
+  color: purple
+
+inputs:
+  project-dir:
+    description: >
+      Relative path to the Elixir project root (where mix.exs is located).
+    required: false
+    default: "./"
+  modules:
+    description: >
+      Comma-separated list of WASM module names to build and package.
+      These must match the module names configured in your Exclosured config.
+    required: true
+  project-version:
+    description: >
+      The version string for the archive filenames. This should match
+      your Elixir package version.
+    required: true
+  elixir-version:
+    description: Elixir version to install.
+    required: false
+    default: "1.17"
+  otp-version:
+    description: Erlang/OTP version to install.
+    required: false
+    default: "27"
+  rust-toolchain:
+    description: Rust toolchain to use (stable, nightly, or a specific version).
+    required: false
+    default: "stable"
+  wasm-bindgen-version:
+    description: >
+      Version of wasm-bindgen-cli to install. Set to "latest" to use
+      the latest version, or a specific version like "0.2.114".
+    required: false
+    default: "latest"
+outputs:
+  archive-dir:
+    description: Directory containing the generated .tar.gz and .sha256 files.
+    value: ${{ steps.package.outputs.archive-dir }}
+  archives:
+    description: Space-separated list of generated .tar.gz file paths.
+    value: ${{ steps.package.outputs.archives }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Elixir
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ inputs.elixir-version }}
+        otp-version: ${{ inputs.otp-version }}
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.rust-toolchain }}
+        targets: wasm32-unknown-unknown
+
+    - name: Cache Cargo bin
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin
+        key: cargo-bin-${{ runner.os }}-wasm-bindgen-${{ inputs.wasm-bindgen-version }}
+
+    - name: Install wasm-bindgen-cli
+      shell: bash
+      run: |
+        if [ "${{ inputs.wasm-bindgen-version }}" = "latest" ]; then
+          command -v wasm-bindgen || cargo install wasm-bindgen-cli
+        else
+          command -v wasm-bindgen || cargo install wasm-bindgen-cli --version "${{ inputs.wasm-bindgen-version }}"
+        fi
+
+    - name: Show version information
+      shell: bash
+      run: |
+        rustup -V
+        cargo -V
+        rustc -V
+        rustc --print=cfg
+        wasm-bindgen --version
+        elixir --version
+        echo "Target: wasm32-unknown-unknown"
+
+    - name: Install Elixir dependencies
+      shell: bash
+      working-directory: ${{ inputs.project-dir }}
+      run: mix deps.get
+
+    - name: Compile project (builds WASM modules)
+      shell: bash
+      working-directory: ${{ inputs.project-dir }}
+      run: mix compile
+
+    - name: Package WASM modules
+      id: package
+      shell: bash
+      working-directory: ${{ inputs.project-dir }}
+      run: |
+        mix exclosured_precompiled.precompile \
+          --version "${{ inputs.project-version }}" \
+          --modules "${{ inputs.modules }}"
+
+        ARCHIVE_DIR="_build/precompiled"
+        ARCHIVES=$(ls ${ARCHIVE_DIR}/*.tar.gz 2>/dev/null | tr '\n' ' ')
+
+        echo "archive-dir=${ARCHIVE_DIR}" >> $GITHUB_OUTPUT
+        echo "archives=${ARCHIVES}" >> $GITHUB_OUTPUT
+
+        echo ""
+        echo "Generated archives:"
+        ls -lh ${ARCHIVE_DIR}/*.tar.gz ${ARCHIVE_DIR}/*.sha256 2>/dev/null
