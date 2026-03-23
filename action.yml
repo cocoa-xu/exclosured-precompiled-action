@@ -92,11 +92,6 @@ runs:
       working-directory: ${{ inputs.project-dir }}
       run: mix deps.get
 
-    - name: Compile project (builds WASM modules)
-      shell: bash
-      working-directory: ${{ inputs.project-dir }}
-      run: mix compile
-
     - name: Package WASM modules
       id: package
       shell: bash
@@ -105,9 +100,7 @@ runs:
         VERSION="${{ inputs.project-version }}"
         VERSION="${VERSION#v}"
 
-        mix exclosured_precompiled.precompile \
-          --version "${VERSION}" \
-          --modules "${{ inputs.modules }}"
+        mix exclosured_precompiled.precompile
 
         ARCHIVE_DIR="_build/precompiled"
         ARCHIVES=$(ls ${ARCHIVE_DIR}/*.tar.gz 2>/dev/null | tr '\n' ' ')
