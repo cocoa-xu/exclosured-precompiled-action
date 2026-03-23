@@ -1,8 +1,5 @@
 name: Exclosured Precompiled Action
-description: >
-  Build Exclosured WASM modules and package them for precompiled distribution.
-  Compiles Rust to wasm32-unknown-unknown, runs wasm-bindgen, and creates
-  tar.gz archives with SHA-256 checksums.
+description: Build and package Exclosured WASM modules for precompiled distribution.
 branding:
   icon: package
   color: purple
